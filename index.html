@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的导航页</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .last-updated {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+
+        .categories {
+            display: grid;
+            gap: 30px;
+        }
+
+        .category {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .category-title {
+            color: white;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .links-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .link-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            padding: 20px;
+            text-decoration: none;
+            color: #333;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .link-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+            background: white;
+        }
+
+        .link-icon {
+            font-size: 1.5rem;
+            min-width: 30px;
+        }
+
+        .link-title {
+            font-weight: 500;
+            font-size: 1rem;
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.1rem;
+            margin-top: 50px;
+        }
+
+        .error {
+            background: rgba(255, 59, 48, 0.1);
+            border: 1px solid rgba(255, 59, 48, 0.3);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .links-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .category {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌟 我的导航页</h1>
+            <div class="last-updated" id="lastUpdated">加载中...</div>
+        </div>
+        
+        <div id="content" class="loading">
+            正在加载导航链接...
+        </div>
+    </div>
+
+    <script>
+        // 从Cloudflare KV获取链接数据
+        async function loadLinks() {
+            try {
+                const response = await fetch('/api/links');
+                if (!response.ok) throw new Error('获取链接失败');
+                
+                const data = await response.json();
+                renderLinks(data);
+                
+                // 更新最后更新时间
+                if (data.lastUpdated) {
+                    const date = new Date(data.lastUpdated);
+                    document.getElementById('lastUpdated').textContent = 
+                        `最后更新：${date.toLocaleString('zh-CN')}`;
+                }
+            } catch (error) {
+                console.error('加载失败:', error);
+                document.getElementById('content').innerHTML = `
+                    <div class="error">
+                        😔 加载链接失败，请稍后重试
+                    </div>
+                `;
+            }
+        }
+
+        // 渲染链接
+        function renderLinks(data) {
+            const content = document.getElementById('content');
+            
+            if (!data.links || data.links.length === 0) {
+                content.innerHTML = '<div class="error">暂无导航链接</div>';
+                return;
+            }
+
+            // 按分类分组
+            const categories = {};
+            data.links.forEach(link => {
+                const category = link.category || '默认';
+                if (!categories[category]) {
+                    categories[category] = [];
+                }
+                categories[category].push(link);
+            });
+
+            // 生成HTML
+            let html = '<div class="categories">';
+            
+            Object.keys(categories).forEach(categoryName => {
+                html += `
+                    <div class="category">
+                        <h2 class="category-title">${categoryName}</h2>
+                        <div class="links-grid">
+                `;
+                
+                categories[categoryName].forEach(link => {
+                    html += `
+                        <a href="${link.url}" target="_blank" class="link-card">
+                            <span class="link-icon">${link.icon || '🔗'}</span>
+                            <span class="link-title">${link.title}</span>
+                        </a>
+                    `;
+                });
+                
+                html += '</div></div>';
+            });
+            
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        // 页面加载时获取链接
+        window.addEventListener('DOMContentLoaded', loadLinks);
+        
+        // 每5分钟自动刷新一次
+        setInterval(loadLinks, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
